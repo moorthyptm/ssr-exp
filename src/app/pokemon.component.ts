@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { isPlatformBrowser, isPlatformServer } from '@angular/common';
+import { Component, inject, PLATFORM_ID } from '@angular/core';
 import { map, Observable } from 'rxjs';
 import { PokemonsResponse } from './model/poke.model';
 import { PokeService } from './poke.service';
@@ -421,6 +422,22 @@ export class PokemonComponent {
   previous$!: Observable<string | null>;
 
   constructor(private pokeService: PokeService) {
+    const platformId = inject(PLATFORM_ID);
+    console.log('platformId', platformId);
+    if (isPlatformBrowser(platformId)) {
+      // Browser
+      //@ts-ignore
+      console.log('Browser', localStorage, window);
+    }
+    if (isPlatformServer(platformId)) {
+      // server
+      try {
+        // console.log('Server', globalThis);
+        console.log('Server', localStorage);
+      } catch (e) {
+        console.log(e);
+      }
+    }
     this.pokemons$ = this.pokeService.getPokemons();
     this.paginationState();
   }
