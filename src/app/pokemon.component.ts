@@ -1,6 +1,7 @@
 import { isPlatformBrowser, isPlatformServer } from '@angular/common';
 import { Component, inject, PLATFORM_ID } from '@angular/core';
-import { map, Observable } from 'rxjs';
+import { makeStateKey, TransferState } from '@angular/platform-browser';
+import { lastValueFrom, map, Observable, of } from 'rxjs';
 import { PokemonsResponse } from './model/poke.model';
 import { PokeService } from './poke.service';
 
@@ -417,28 +418,47 @@ import { PokeService } from './poke.service';
   `,
 })
 export class PokemonComponent {
-  pokemons$: Observable<PokemonsResponse>;
+  pokemons$!: Observable<PokemonsResponse | null>;
   next$!: Observable<string | null>;
   previous$!: Observable<string | null>;
 
-  constructor(private pokeService: PokeService) {
+  constructor(
+    private pokeService: PokeService,
+    private transferState: TransferState
+  ) {
     const platformId = inject(PLATFORM_ID);
-    console.log('platformId', platformId);
+
     if (isPlatformBrowser(platformId)) {
       // Browser
-      //@ts-ignore
-      console.log('Browser', localStorage, window);
+      // console.log('Browser', localStorage, window);
     }
     if (isPlatformServer(platformId)) {
       // server
       try {
         // console.log('Server', globalThis);
-        console.log('Server', localStorage);
+        // console.log('Server', localStorage);
       } catch (e) {
         console.log(e);
       }
     }
-    this.pokemons$ = this.pokeService.getPokemons();
+    this.init();
+  }
+
+  async init() {
+    const transferStateKey = makeStateKey<PokemonsResponse>('pokeData');
+    if (this.transferState.hasKey(transferStateKey)) {
+      this.pokemons$ = of(
+        this.transferState.get<PokemonsResponse | null>(transferStateKey, null)
+      );
+      this.transferState.remove(transferStateKey);
+    } else {
+      this.pokemons$ = this.pokeService.getPokemons();
+      const pokemons = await lastValueFrom(this.pokemons$);
+      this.transferState.set<PokemonsResponse | null>(
+        transferStateKey,
+        pokemons
+      );
+    }
     this.paginationState();
   }
 
@@ -451,10 +471,10 @@ export class PokemonComponent {
 
   paginationState(): void {
     this.next$ = this.pokemons$.pipe(
-      map((pokemonsResponse) => pokemonsResponse.next)
+      map((pokemonsResponse) => pokemonsResponse?.next || null)
     );
     this.previous$ = this.pokemons$.pipe(
-      map((pokemonsResponse) => pokemonsResponse.previous)
+      map((pokemonsResponse) => pokemonsResponse?.previous || null)
     );
   }
 }
